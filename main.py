@@ -1,25 +1,28 @@
 import discord
+from discord.ext import commands
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-intents = discord.Intents.all()
-client = discord.Client(intents=intents)
+
+class Bot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="\x00", intents=discord.Intents.all())
+
+    async def setup_hook(self):
+        for filename in os.listdir("./cogs"):
+            if filename.endswith(".py") and not filename.startswith("_"):
+                await self.load_extension(f"cogs.{filename[:-3]}")
+        await self.tree.sync(guild=discord.Object(id=290553862476136449))
 
 
-@client.event
+bot = Bot()
+
+
+@bot.event
 async def on_ready():
-    print(f"We have logged in as {client.user}")
+    print(f"Logged in as {bot.user}")
 
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
-
-    if message.content.startswith("$hello"):
-        await message.channel.send("Hello!")
-
-
-client.run(os.getenv("TOKEN", ""))
+bot.run(os.getenv("TOKEN", ""))
