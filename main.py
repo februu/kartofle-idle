@@ -14,7 +14,9 @@ class Bot(commands.Bot):
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py") and not filename.startswith("_"):
                 await self.load_extension(f"cogs.{filename[:-3]}")
-        await self.tree.sync(guild=discord.Object(id=290553862476136449))
+        guild = discord.Object(id=290553862476136449)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
 
 
 bot = Bot()
