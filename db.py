@@ -196,7 +196,3 @@ def create_transaction(user_id, amount, source, source_id):
         transaction = Transaction(user_id=user_id, amount=amount, source=source, source_id=source_id)
         s.add(transaction)
         s.commit()
-
-
-# --- initialize with some dummy data for testing ---
-create_transaction(user_id=175652881456693249, amount=1000, source="init", source_id=0)
