@@ -53,44 +53,53 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
     if not game:
         await interaction.response.send_message("Game not found.", ephemeral=True)
         return
-    option = db.get_options_for_game(game_id)
-    if option_id not in [opt.id for opt in option]:
+
+    if game.resolved:
+        await interaction.response.send_message("This game was already resolved.", ephemeral=True)
+        return
+
+    options = db.get_options_for_game(game_id)
+    selected_option = next((opt for opt in options if opt.id == option_id), None)
+    if not selected_option:
         await interaction.response.send_message("Option not found.", ephemeral=True)
         return
+
     balance = db.get_user_balance(interaction.user.id)
     if balance < amount:
         await interaction.response.send_message("You don't have enough balance to place this bet.", ephemeral=True)
         return
+
     bet_id = db.create_bet(interaction.user.id, game_id, option_id, amount)
-    db.create_transaction(interaction.user.id, -amount, f"Bet on game {game_id}, option {option_id}", bet_id)
-    await interaction.response.send_message(
-        f"Bet placed: {amount} on option {option[option_id].description} for game {game.description}."
+    db.create_transaction(
+        interaction.user.id,
+        -amount,
+        f"Bet on game {game.title}#{game.id}, option {selected_option.description}",
+        bet_id,
     )
-    # TODO: Fix option[option_id]
+    await interaction.response.send_message(
+        f"Bet placed: **{amount}** on option **{selected_option.description}** for game **{game.title}#{game.id}**."
+    )
 
 
-async def create_game(interaction: discord.Interaction, title, description, options):
+async def create_game(interaction: discord.Interaction, title: str, description: str, options: list[str]):
     game_id = db.create_game(title, description, options)
     message = await interaction.response.send_message(f"**{title}**\n{description}\nOptions: {', '.join(options)}")
     db.update_game_message_id(game_id, message.id)
 
 
-async def settle_game(interaction: discord.Interaction, id, winning_option):
-    # find game by id
-    game = db.find_game_by_id(id)
+async def settle_game(interaction: discord.Interaction, id: int, winning_option: int):
+    game = db.get_game_by_id(id)
     if not game:
         await interaction.response.send_message("Game not found.", ephemeral=True)
         return
-    # create transactions for all winning bets
-    db.create_winning_transactions(game, winning_option)
-    # edit message to show that the game is settled and what the winning option was
-    await interaction.response.send_message(f"game has been settled. Winning option: {winning_option}")
+    db.create_winning_transactions(game.id, winning_option)
+    await interaction.response.send_message(f"**{game.title}** has been settled. Winning option: {winning_option}")
 
 
-async def remove_betting_game(message_id):
-    if db.remove_game_by_message_id(message_id):
-        # TODO: Return money to all players who placed bets on this game
-        ...
+async def remove_betting_game(message_id: int):
+    game = db.get_game_by_message_id(message_id)
+    if game:
+        db.create_refund_transactions_for_bets(game.id)
 
 
 ### ---------------------------------------------- ###
@@ -137,7 +146,7 @@ class BettingCog(commands.Cog):
     @app_commands.command(name="settle", description="[ADMIN ONLY] Settle a betting game")
     @app_commands.describe(game="The betting game to settle", winning_option="The winning option")
     @app_commands.autocomplete(game=autocomplete_games, winning_option=autocomplete_game_options)
-    async def settle_game(self, interaction: discord.Interaction, game: str, winning_option: str):
+    async def settle_game(self, interaction: discord.Interaction, game: int, winning_option: int):
         if not is_sent_in_guild(interaction):
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
             return
@@ -145,6 +154,10 @@ class BettingCog(commands.Cog):
             await interaction.response.send_message("You lack permissions, what a shame...", ephemeral=True)
             return
         await settle_game(interaction, game, winning_option)
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        await remove_betting_game(payload.message_id)
 
 
 async def setup(bot: commands.Bot):
