@@ -77,7 +77,7 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
         bet_id,
     )
     await interaction.response.send_message(
-        f"Bet placed: **{amount}** on option **{selected_option.description}** for game **{game.title}#{game.id}**."
+        f"Bet placed: **{amount}** on option **{selected_option.description}** for game **{game.title}**."
     )
 
 
@@ -93,7 +93,14 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
         await interaction.response.send_message("Game not found.", ephemeral=True)
         return
     db.create_winning_transactions(game.id, winning_option)
-    await interaction.response.send_message(f"**{game.title}** has been settled. Winning option: {winning_option}")
+    options = db.get_options_for_game(game.id)
+    winning_option_description = next(
+        (opt.description for opt in options if opt.id == winning_option), "Unknown option"
+    )
+    winners = db.get_betters_for_option(game.id, winning_option)
+    await interaction.response.send_message(
+        f"**{game.title}** has been settled. Winning option: {winning_option_description}. Winners: {', '.join(f'<@{winner}>' for winner in winners) if winners else 'No winners'}."
+    )
 
 
 async def remove_betting_game(message_id: int):

@@ -92,13 +92,13 @@ Base.metadata.create_all(engine)
 # --- GET ---
 
 
-def get_user_balance(user_id) -> float:
+def get_user_balance(user_id: int) -> float:
     with Session(engine) as s:
         result = s.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.user_id == user_id))
         return result.scalar_one()
 
 
-def get_game_by_message_id(message_id) -> Game | None:
+def get_game_by_message_id(message_id: int) -> Game | None:
     with Session(engine) as s:
         return s.query(Game).filter_by(message_id=message_id).first()
 
@@ -108,20 +108,25 @@ def get_open_games() -> list[Game]:
         return s.query(Game).filter_by(resolved=False).all()
 
 
-def get_game_by_id(game_id) -> Game | None:
+def get_game_by_id(game_id: int) -> Game | None:
     with Session(engine) as s:
         return s.get(Game, game_id)
 
 
-def get_options_for_game(game_id) -> list[Option]:
+def get_options_for_game(game_id: int) -> list[Option]:
     with Session(engine) as s:
         return s.query(Option).filter_by(game_id=game_id).all()
+
+
+def get_betters_for_option(game_id: int, option_id: int) -> list[int]:
+    with Session(engine) as s:
+        return list(s.scalars(select(Bet.user_id).filter_by(game_id=game_id, option_id=option_id)).all())
 
 
 # --- CREATE ---
 
 
-def create_game(title, description, options) -> int:
+def create_game(title: str, description: str, options: list[str]) -> int:
     with Session(engine) as s:
         game = Game(title=title, description=description, options=[Option(description=opt) for opt in options])
         s.add(game)
@@ -131,7 +136,7 @@ def create_game(title, description, options) -> int:
         return game_id
 
 
-def create_bet(user_id, game_id, option_id, amount) -> int:
+def create_bet(user_id: int, game_id: int, option_id: int, amount: float) -> int:
     with Session(engine) as s:
         bet = Bet(user_id=user_id, game_id=game_id, option_id=option_id, amount=amount)
         s.add(bet)
@@ -140,7 +145,7 @@ def create_bet(user_id, game_id, option_id, amount) -> int:
         return bet.id
 
 
-def create_transaction(user_id, amount, source, source_id):
+def create_transaction(user_id: int, amount: float, source: str, source_id: int):
     with Session(engine) as s:
         transaction = Transaction(user_id=user_id, amount=amount, source=source, source_id=source_id)
         s.add(transaction)
@@ -198,9 +203,12 @@ def create_refund_transactions_for_bets(game_id: int):
 # --- UPDATE ---
 
 
-def update_game_message_id(game_id, message_id):
+def update_game_message_id(game_id: int, message_id: int):
     with Session(engine) as s:
         game = s.get(Game, game_id)
         if game:
             game.message_id = message_id
             s.commit()
+
+
+create_transaction(user_id=175652881456693249, amount=1000, source="init", source_id=0)
