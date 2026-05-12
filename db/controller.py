@@ -2,10 +2,15 @@ import os
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .schema import Bet, Game, Option, Transaction, engine
+from .engine import engine
+from .schema import Bet, Game, Option, Transaction
 from .init import init_db, init_dev_db
 
 DEV = os.getenv("DEV", "").lower() in {"1", "true", "yes", "on"}
+
+init_db()
+if DEV:
+    init_dev_db()
 
 
 # --- GET ---
@@ -39,7 +44,7 @@ def get_options_for_game(game_id: int) -> list[Option]:
 
 def get_betters_for_option(game_id: int, option_id: int) -> list[int]:
     with Session(engine) as s:
-        return list(s.scalars(select(Bet.user_id).filter_by(game_id=game_id, option_id=option_id)).all())
+        return [user_id for (user_id,) in s.query(Bet.user_id).filter_by(game_id=game_id, option_id=option_id).all()]
 
 
 # --- CREATE ---
@@ -139,8 +144,3 @@ def delete_game(game_id: int):
         if game:
             s.delete(game)
             s.commit()
-
-
-init_db()
-if DEV:
-    init_dev_db()

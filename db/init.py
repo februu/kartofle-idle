@@ -1,12 +1,11 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .schema import Base, Job, Transaction, engine
+from .engine import engine
+from .schema import Job, Transaction
 
 
 def init_db() -> None:
-    Base.metadata.create_all(engine)
-
     with Session(engine) as session:
         jobs_count = session.execute(select(func.count()).select_from(Job)).scalar_one()
         if jobs_count:

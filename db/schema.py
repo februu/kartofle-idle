@@ -1,10 +1,7 @@
-import os
-
-from sqlalchemy import ForeignKey, create_engine, text
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-_db_path = os.getenv("SQLITE_PATH", ":memory:")
-engine = create_engine(f"sqlite:///{_db_path}")
+from .engine import engine
 
 
 class Base(DeclarativeBase):
@@ -17,7 +14,7 @@ class Transaction(Base):
     id: Mapped[int] = mapped_column("transaction_id", primary_key=True)
     user_id: Mapped[int]
     amount: Mapped[float]
-    timestamp: Mapped[str] = mapped_column(server_default=text("(datetime('now'))"))
+    timestamp: Mapped[str] = mapped_column(server_default="(datetime('now'))")
     source: Mapped[str]
     source_id: Mapped[int]
 
@@ -39,7 +36,7 @@ class JobLog(Base):
     user_id: Mapped[int]
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.job_id"))
     end_time: Mapped[str]
-    collected: Mapped[int] = mapped_column(default=0)
+    collected: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class PassiveIncome(Base):
@@ -56,10 +53,10 @@ class Game(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column("game_id", primary_key=True)
-    message_id: Mapped[int] = mapped_column(default=0)
+    message_id: Mapped[int | None] = mapped_column(default=None)
     title: Mapped[str]
     description: Mapped[str | None]
-    resolved: Mapped[bool] = mapped_column(default=False)
+    resolved: Mapped[bool] = mapped_column(default=False, server_default="0")
 
     options: Mapped[list["Option"]] = relationship(back_populates="game", cascade="all, delete-orphan")
     bets: Mapped[list["Bet"]] = relationship(back_populates="game", cascade="all, delete-orphan")
@@ -85,3 +82,6 @@ class Bet(Base):
     option_id: Mapped[int] = mapped_column(ForeignKey("options.option_id"))
 
     game: Mapped["Game"] = relationship(back_populates="bets")
+
+
+Base.metadata.create_all(engine)
