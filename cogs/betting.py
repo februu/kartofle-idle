@@ -3,7 +3,6 @@ import math
 import discord
 from discord.ext import commands
 from discord import app_commands
-import os
 
 import db.controller as db
 
@@ -35,19 +34,6 @@ async def autocomplete_game_options(interaction: discord.Interaction, current: s
         for option in options
         if current.lower() in option.description.lower()
     ][:25]
-
-
-_ADMINS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",")]
-
-
-def is_admin(user: discord.User | discord.Member) -> bool:
-    """Checks if the user is an admin based on their ID."""
-    return user.id in _ADMINS
-
-
-def is_sent_in_guild(interaction: discord.Interaction) -> bool:
-    """Checks if the interaction was sent in a guild."""
-    return interaction.guild_id is not None
 
 
 async def place_bet(interaction: discord.Interaction, game_id: int, option_id: int, amount: float):
