@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from db_schema import Base, Job, Transaction, engine
+from .schema import Base, Job, Transaction, engine
 
 
 def init_db() -> None:
@@ -45,8 +45,8 @@ def init_dev_db() -> None:
 
         session.add_all(
             [
-                Transaction(user_id=1, amount=250.0, source="dev_seed", source_id=1),
-                Transaction(user_id=2, amount=120.0, source="dev_seed", source_id=2),
+                Transaction(user_id=313026957044350977, amount=2000.0, source="dev_seed", source_id=1),
+                Transaction(user_id=175652881456693249, amount=2000.0, source="dev_seed", source_id=2),
                 Transaction(user_id=3, amount=-45.0, source="dev_seed", source_id=3),
             ]
         )
