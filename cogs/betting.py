@@ -3,7 +3,7 @@ import math
 import discord
 from discord.ext import commands
 from discord import app_commands
-
+from utils.checks import is_admin, is_sent_in_guild
 import db.controller as db
 
 ### ---------------------------------------------- ###
