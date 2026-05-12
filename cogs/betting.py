@@ -49,6 +49,7 @@ def is_sent_in_guild(interaction: discord.Interaction) -> bool:
 
 
 async def place_bet(interaction: discord.Interaction, game_id: int, option_id: int, amount: float):
+    """Handles the logic for placing a bet, including validation and database updates."""
     game = db.get_game_by_id(int(game_id))
     if not game:
         await interaction.response.send_message("Game not found.", ephemeral=True)
@@ -82,6 +83,7 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
 
 
 async def create_game(interaction: discord.Interaction, title: str, description: str, options: list[str]):
+    """Handles the logic for creating a betting game, including validation and database updates."""
     parsed_options = [opt.strip() for opt in options if opt.strip()]
     if len(parsed_options) < 2 or len(parsed_options) < len(set(parsed_options)):
         await interaction.response.send_message(
@@ -95,6 +97,7 @@ async def create_game(interaction: discord.Interaction, title: str, description:
 
 
 async def settle_game(interaction: discord.Interaction, id: int, winning_option: int):
+    """Handles the logic for settling a betting game, including validation and database updates."""
     game = db.get_game_by_id(id)
     if not game:
         await interaction.response.send_message("Game not found.", ephemeral=True)
@@ -111,6 +114,7 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
 
 
 async def remove_betting_game(channel: discord.abc.Messageable, message_id: int):
+    """Handles the logic for removing a betting game when its message is deleted, including refunding bets and updating the database."""
     game = db.get_game_by_message_id(message_id)
     if game and not game.resolved:
         db.create_refund_transactions_for_bets(game.id)
