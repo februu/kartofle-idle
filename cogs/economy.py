@@ -14,6 +14,18 @@ class Economy(commands.Cog):
         balance = db.get_user_balance(interaction.user.id)
         await interaction.response.send_message(f"Siema, masz na koncie {balance} kartofli.")
 
+    @app_commands.command(name="transactions", description="Checks your transaction history")
+    async def transactions(self, interaction: discord.Interaction):
+        transactions = db.get_user_transactions(interaction.user.id, limit=10)
+        if not transactions:
+            await interaction.response.send_message("You have no transaction history.")
+            return
+
+        message = "Your last 10 transactions:\n"
+        for tx in transactions:
+            message += f"**{'+' if tx.amount > 0 else '-'}** _{tx.source}_: {tx.amount}\n"
+        await interaction.response.send_message(message)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Economy(bot))

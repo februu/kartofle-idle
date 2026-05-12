@@ -22,6 +22,17 @@ def get_user_balance(user_id: int) -> float:
         return result.scalar_one()
 
 
+def get_user_transactions(user_id: int, limit: int = 10) -> list[Transaction]:
+    with Session(engine) as s:
+        return (
+            s.query(Transaction)
+            .filter(Transaction.user_id == user_id)
+            .order_by(Transaction.timestamp.asc())
+            .limit(limit)
+            .all()
+        )
+
+
 def get_game_by_message_id(message_id: int) -> Game | None:
     with Session(engine) as s:
         return s.query(Game).filter_by(message_id=message_id).first()
