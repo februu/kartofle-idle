@@ -1,3 +1,5 @@
+import math
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -65,6 +67,7 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
         await interaction.response.send_message("Option not found.", ephemeral=True)
         return
 
+    amount = math.floor(amount * 100) / 100
     balance = db.get_user_balance(interaction.user.id)
     if balance < amount:
         await interaction.response.send_message("You don't have enough balance to place this bet.", ephemeral=True)
@@ -78,7 +81,7 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
         bet_id,
     )
     await interaction.response.send_message(
-        f"Bet placed: **{amount}** on option **{selected_option.description}** for game **{game.title}**."
+        f"<@{interaction.user.id}> bet **{amount}** on option **{selected_option.description}** for game **{game.title}**."
     )
 
 
