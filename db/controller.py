@@ -58,6 +58,11 @@ def get_betters_for_option(game_id: int, option_id: int) -> list[int]:
         return [user_id for (user_id,) in s.query(Bet.user_id).filter_by(game_id=game_id, option_id=option_id).all()]
 
 
+def get_user_bet_for_game(user_id: int, game_id: int) -> Bet | None:
+    with Session(engine) as s:
+        return s.query(Bet).filter_by(user_id=user_id, game_id=game_id).first()
+
+
 # --- CREATE ---
 
 
