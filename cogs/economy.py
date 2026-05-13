@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 
 import db.controller as db
+from utils.embed import CustomEmbed
 
 
 class Economy(commands.Cog):
@@ -12,19 +13,25 @@ class Economy(commands.Cog):
     @app_commands.command(name="balance", description="Checks your balance")
     async def balance(self, interaction: discord.Interaction):
         balance = db.get_user_balance(interaction.user.id)
-        await interaction.response.send_message(f"Siema, masz na koncie {balance} kartofli.")
+        embed = CustomEmbed(
+            title="Balance",
+            description=f"You have {balance} kartoffeln.\n-# Use **/transactions** to see your transaction history.",
+        )
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="transactions", description="Checks your transaction history")
     async def transactions(self, interaction: discord.Interaction):
         transactions = db.get_user_transactions(interaction.user.id, limit=10)
         if not transactions:
-            await interaction.response.send_message("You have no transaction history.")
+            embed = CustomEmbed(title="Transactions", description="You have no transaction history.")
+            await interaction.response.send_message(embed=embed)
             return
 
         message = "Your last 10 transactions:\n"
         for tx in transactions:
-            message += f"**{'+' if tx.amount > 0 else '-'}** _{tx.source}_: {tx.amount}\n"
-        await interaction.response.send_message(message)
+            message += f"-# [ **{'+' if tx.amount >= 0 else '-'}{abs(tx.amount)}** ]\t *{tx.source}* \n"
+        embed = CustomEmbed(title="Transactions", description=message)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):

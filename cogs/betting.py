@@ -1,9 +1,10 @@
 import math
-
 import discord
 from discord.ext import commands
 from discord import app_commands
+
 from utils.checks import is_admin, is_sent_in_guild
+from utils.embed import CustomEmbed
 import db.controller as db
 
 ### ---------------------------------------------- ###
@@ -66,9 +67,11 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
         f"Bet on game {game.title}#{game.id}, option {selected_option.description}",
         bet_id,
     )
-    await interaction.response.send_message(
-        f"<@{interaction.user.id}> bet **{amount}** on option **{selected_option.description}** for game **{game.title}**."
+    embed = CustomEmbed(
+        title="Bet placed",
+        description=f"<@{interaction.user.id}> placed a bet of **{amount}** on option **{selected_option.description}** for game **{game.title}**.",
     )
+    await interaction.response.send_message(embed=embed)
 
 
 async def create_game(interaction: discord.Interaction, title: str, description: str, options: list[str]):
@@ -80,7 +83,10 @@ async def create_game(interaction: discord.Interaction, title: str, description:
         )
         return
     game_id = db.create_game(title, description, parsed_options)
-    await interaction.response.send_message(f"**{title}**\n{description}\nOptions: {', '.join(options)}")
+    embed = CustomEmbed(
+        title=title, description=f"{description} \n-# Game ID: {game_id} \n-# Use the buttons below to place your bets!"
+    )
+    await interaction.response.send_message(embed=embed)
     message = await interaction.original_response()
     db.update_game_message_id(game_id, message.id)
 
@@ -97,9 +103,11 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
         (opt.description for opt in options if opt.id == winning_option), "Unknown option"
     )
     winners = db.get_betters_for_option(game.id, winning_option)
-    await interaction.response.send_message(
-        f"**{game.title}** has been settled. Winning option: {winning_option_description}. Winners: {', '.join(f'<@{winner}>' for winner in winners) if winners else 'No winners'}."
+    embed = CustomEmbed(
+        title=f"Game settled: {game.title}",
+        description=f"Winning option: **{winning_option_description}**\n-# Winners: {', '.join(f'<@{winner}>' for winner in winners) if winners else 'no one won :('}",
     )
+    await interaction.response.send_message(embed=embed)
 
 
 async def remove_betting_game(channel: discord.abc.Messageable, message_id: int):
