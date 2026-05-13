@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-from utils.checks import is_admin, is_sent_in_guild
+from utils.checks import admin_only, guild_only
 from utils.embed import CustomEmbed
 import db.controller as db
 
@@ -198,25 +198,17 @@ class BettingCog(commands.Cog):
         description="Description of the betting game",
         options="Comma-separated list of options (e.g. Option 1,Option 2,Option 3)",
     )
+    @admin_only()
+    @guild_only()
     async def create_game(self, interaction: discord.Interaction, title: str, description: str, options: str):
-        if not is_sent_in_guild(interaction):
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
-            return
-        if not is_admin(interaction.user):
-            await interaction.response.send_message("You lack permissions, what a shame...", ephemeral=True)
-            return
         await create_game(interaction, title, description, options.split(","))
 
     @app_commands.command(name="settle", description="[ADMIN ONLY] Settle a betting game")
     @app_commands.describe(game="The betting game to settle", winning_option="The winning option")
     @app_commands.autocomplete(game=autocomplete_games, winning_option=autocomplete_game_options)
+    @admin_only()
+    @guild_only()
     async def settle_game(self, interaction: discord.Interaction, game: int, winning_option: int):
-        if not is_sent_in_guild(interaction):
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
-            return
-        if not is_admin(interaction.user):
-            await interaction.response.send_message("You lack permissions, what a shame...", ephemeral=True)
-            return
         await settle_game(interaction, game, winning_option)
 
     @commands.Cog.listener()
