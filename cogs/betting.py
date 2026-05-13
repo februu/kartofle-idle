@@ -217,6 +217,10 @@ class BettingCog(commands.Cog):
         assert isinstance(channel, discord.abc.Messageable)
         await remove_betting_game(channel, payload.message_id)
 
+    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):  # noqa: ARG002
+        if not isinstance(error, app_commands.CheckFailure):
+            raise error
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(BettingCog(bot))

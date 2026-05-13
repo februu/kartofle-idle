@@ -20,9 +20,9 @@ def admin_only():
     """A decorator that checks if the user is an admin."""
 
     async def predicate(interaction: discord.Interaction) -> bool:
-        if not isinstance(interaction.user, discord.User or discord.Member) or interaction.user.id not in _ADMINS:
+        if interaction.user.id not in _ADMINS:
             await interaction.response.send_message("You lack permissions, what a shame...", ephemeral=True)
-            return False
+            raise app_commands.CheckFailure()
         return True
 
     return app_commands.check(predicate)
