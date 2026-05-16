@@ -1,10 +1,41 @@
 import os
+from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .engine import engine
-from .schema import Bet, Game, Option, Transaction
+from .schema import Bet, Game, Option, Transaction, Job, JobLog
 from .init import init_db, init_dev_db
+
+
+### ---------------------------------------------- ###
+###    Helper functions for database operations    ###
+### ---------------------------------------------- ###
+
+
+def _get_current_time_iso() -> str:
+    """Get current time in ISO format without microseconds for consistent DB storage and comparison."""
+    return datetime.now().replace(microsecond=0).isoformat()
+
+
+def settle_unfinished_jobs():
+    """Checks for any jobs that should have been completed by now and settles them by creating transactions."""
+    with Session(engine) as s:
+        now_iso = _get_current_time_iso()
+        unfinished_job_logs = s.query(JobLog).filter(JobLog.end_time <= now_iso, JobLog.collected == 0).all()
+
+        for job_log in unfinished_job_logs:
+            job = s.get(Job, job_log.job_id)
+            if job:
+                create_transaction(
+                    user_id=job_log.user_id,
+                    amount=job.amount,
+                    source=f"Completed job: {job.title}",
+                    source_id=job.id,
+                )
+
+            update_job_log_collected(job_log.id)
+
 
 DEV = os.getenv("DEV", "").lower() in {"1", "true", "yes", "on"}
 
@@ -17,12 +48,14 @@ if DEV:
 
 
 def get_user_balance(user_id: int) -> float:
+    settle_unfinished_jobs()
     with Session(engine) as s:
         result = s.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.user_id == user_id))
         return result.scalar_one()
 
 
 def get_user_transactions(user_id: int, limit: int = 10) -> list[Transaction]:
+    settle_unfinished_jobs()
     with Session(engine) as s:
         return (
             s.query(Transaction)
@@ -61,6 +94,56 @@ def get_betters_for_option(game_id: int, option_id: int) -> list[int]:
 def get_user_bet_for_game(user_id: int, game_id: int) -> Bet | None:
     with Session(engine) as s:
         return s.query(Bet).filter_by(user_id=user_id, game_id=game_id).first()
+
+
+def get_jobs() -> list[Job]:
+    with Session(engine) as s:
+        return s.query(Job).all()
+
+
+def get_job_by_id(job_id: int) -> Job | None:
+    with Session(engine) as s:
+        return s.get(Job, job_id)
+
+
+def get_unassigned_jobs() -> list[Job]:
+    with Session(engine) as s:
+        now_iso = _get_current_time_iso()
+        active_job_exists = select(JobLog.job_id).where(
+            JobLog.job_id == Job.id,
+            JobLog.end_time > now_iso,
+        )
+        return s.query(Job).where(~active_job_exists.exists()).all()
+
+
+def get_active_job_log_by_user(user_id: int) -> JobLog | None:
+    with Session(engine) as s:
+        now_iso = _get_current_time_iso()
+        job_log = (
+            s.query(JobLog)
+            .filter(JobLog.user_id == user_id, JobLog.end_time > now_iso)
+            .order_by(JobLog.end_time.desc())
+            .first()
+        )
+        if not job_log:
+            return None
+
+        return job_log
+
+
+def get_active_jobs() -> list[Job]:
+    with Session(engine) as s:
+        now_iso = _get_current_time_iso()
+        active_job_logs = s.query(JobLog.job_id.distinct()).filter(JobLog.end_time > now_iso).all()
+        if not active_job_logs:
+            return []
+        job_ids = [log[0] for log in active_job_logs]
+        return s.query(Job).filter(Job.id.in_(job_ids)).all()
+
+
+def get_job_logs() -> list[JobLog]:
+    with Session(engine) as s:
+        return s.query(JobLog).all()
 
 
 # --- CREATE ---
@@ -140,6 +223,18 @@ def create_refund_transactions_for_bets(game_id: int):
         s.commit()
 
 
+def create_job_log(user_id: int, job_id: int, end_time: str):
+    with Session(engine) as s:
+        s.add(
+            JobLog(
+                user_id=user_id,
+                job_id=job_id,
+                end_time=end_time,
+            )
+        )
+        s.commit()
+
+
 # --- UPDATE ---
 
 
@@ -148,6 +243,14 @@ def update_game_message_id(game_id: int, message_id: int):
         game = s.get(Game, game_id)
         if game:
             game.message_id = message_id
+            s.commit()
+
+
+def update_job_log_collected(log_id: int):
+    with Session(engine) as s:
+        job_log = s.get(JobLog, log_id)
+        if job_log:
+            job_log.collected = 1
             s.commit()
 
 
