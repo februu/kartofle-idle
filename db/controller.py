@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .engine import engine
-from .schema import Bet, Game, Option, Transaction, Job, JobLog
+from .schema import Bet, Game, Option, Transaction, Job, JobLog, PassiveIncome
 from .init import init_db, init_dev_db
 
 
@@ -37,6 +37,34 @@ def settle_unfinished_jobs():
             update_job_log_collected(job_log.id)
 
 
+def settle_passive_income():
+    """Settles all passive income by calculating earned amount based on time elapsed since last settlement."""
+    from datetime import datetime as dt
+
+    with Session(engine) as s:
+        now_iso = _get_current_time_iso()
+        passive_incomes = s.query(PassiveIncome).all()
+
+        for passive in passive_incomes:
+            last_settled = dt.fromisoformat(passive.last_settled)
+            now = dt.fromisoformat(now_iso)
+
+            seconds_elapsed = (now - last_settled).total_seconds()
+            earned_amount = seconds_elapsed * passive.amount_per_second
+
+            if earned_amount > 0:
+                create_transaction(
+                    user_id=passive.user_id,
+                    amount=earned_amount,
+                    source=f"Passive income: {passive.title}",
+                    source_id=passive.id,
+                )
+
+            passive.last_settled = now_iso
+
+        s.commit()
+
+
 DEV = os.getenv("DEV", "").lower() in {"1", "true", "yes", "on"}
 
 init_db()
@@ -49,6 +77,7 @@ if DEV:
 
 def get_user_balance(user_id: int) -> float:
     settle_unfinished_jobs()
+    settle_passive_income()
     with Session(engine) as s:
         result = s.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.user_id == user_id))
         return result.scalar_one()
@@ -56,6 +85,7 @@ def get_user_balance(user_id: int) -> float:
 
 def get_user_transactions(user_id: int, limit: int = 10) -> list[Transaction]:
     settle_unfinished_jobs()
+    settle_passive_income()
     with Session(engine) as s:
         return (
             s.query(Transaction)
@@ -233,6 +263,23 @@ def create_job_log(user_id: int, job_id: int, end_time: str):
             )
         )
         s.commit()
+
+
+def create_passive_income(user_id: int, title: str, description: str | None, amount_per_second: float) -> int:
+    """Creates a passive income stream for a user. Returns the income_id."""
+    with Session(engine) as s:
+        passive = PassiveIncome(
+            user_id=user_id,
+            title=title,
+            description=description,
+            amount_per_second=amount_per_second,
+            last_settled=_get_current_time_iso(),
+        )
+        s.add(passive)
+        s.flush()
+        income_id = passive.id
+        s.commit()
+        return income_id
 
 
 # --- UPDATE ---

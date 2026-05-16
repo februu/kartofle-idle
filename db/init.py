@@ -2,7 +2,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .engine import engine
-from .schema import Job, Transaction
+from .schema import Job, Transaction, PassiveIncome
+
+# To refactor in future
+from datetime import datetime
+
+
+def _get_current_time_iso() -> str:
+    """Get current time in ISO format without microseconds for consistent DB storage and comparison."""
+    return datetime.now().replace(microsecond=0).isoformat()
 
 
 def init_db() -> None:
@@ -30,6 +38,13 @@ def init_db() -> None:
                     description="Dostarczasz kartofle do sklepu po zmroku.",
                     amount=60.0,
                     duration_seconds=15,
+                ),
+                PassiveIncome(
+                    user_id=313026957044350977,
+                    title="Kartofelowy Plantator",
+                    description="Posiadasz własne pole kartofli, które generuje dochód pasywny.",
+                    amount_per_second=0.5,
+                    last_settled=_get_current_time_iso(),
                 ),
             ]
         )

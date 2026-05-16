@@ -47,6 +47,7 @@ class PassiveIncome(Base):
     title: Mapped[str]
     description: Mapped[str | None]
     amount_per_second: Mapped[float]
+    last_settled: Mapped[str] = mapped_column(default=None)  # Tracks when income was last settled
 
 
 class Game(Base):
