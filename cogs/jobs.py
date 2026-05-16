@@ -60,7 +60,7 @@ async def get_active_job_status(user_id: int) -> str:
     return job_text
 
 
-async def has_active_assignment(job_id: int) -> bool:
+async def has_active_job_assignment(job_id: int) -> bool:
     """Checks if a job is currently assigned to any user."""
     active_jobs = db.get_active_jobs()
     return any(j.id == job_id for j in active_jobs)
@@ -78,7 +78,6 @@ class JobsCog(commands.Cog):
     @app_commands.command(name="job", description="Show status of your current job")
     @guild_only()
     async def job(self, interaction: discord.Interaction):
-
         job_text = await get_active_job_status(interaction.user.id)
         embed = CustomEmbed(title="Job status", description=job_text)
 
@@ -91,7 +90,7 @@ class JobsCog(commands.Cog):
         @app_commands.autocomplete(job=autocomplete_unassigned_jobs)
         @guild_only()
         async def work(self, interaction: discord.Interaction, job: str):
-            if await has_active_assignment(int(job)):
+            if await has_active_job_assignment(int(job)):
                 embed = CustomEmbed(
                     title="Failed to start the job",
                     description=f"This job is currently assigned to another user. \n-# Use **/jobs** to see available jobs.",

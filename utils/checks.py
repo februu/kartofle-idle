@@ -3,7 +3,6 @@ import discord
 from discord import app_commands
 
 _ADMINS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",")]
-_UNIQUE_JOBS = os.getenv("UNIQUE_JOBS", "").lower() in {"1", "true", "yes", "on"}
 
 
 def admin_only():
