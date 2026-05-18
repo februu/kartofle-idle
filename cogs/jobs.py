@@ -66,6 +66,21 @@ async def has_active_job_assignment(job_id: int) -> bool:
     return any(j.id == job_id for j in active_jobs)
 
 
+async def get_user_passive_income_status(user_id: int) -> str:
+    """Checks if the user has active passive income and returns its status."""
+    passive_incomes = db.get_passive_incomes_by_user(user_id)
+    if not passive_incomes:
+        return "You don't have any passive income sources. Maybe it's time to get some?"
+
+    income_texts = []
+    for income in passive_incomes:
+        income_texts.append(
+            f"{income.title}: {income.amount_per_second} per second (last settled: {income.last_settled})"
+        )
+
+    return "\n".join(income_texts)
+
+
 ### ---------------------------------------------- ###
 ###                 Jobs Cog                       ###
 ### ---------------------------------------------- ###
@@ -80,6 +95,15 @@ class JobsCog(commands.Cog):
     async def job(self, interaction: discord.Interaction):
         job_text = await get_active_job_status(interaction.user.id)
         embed = CustomEmbed(title="Job status", description=job_text)
+
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="ubi", description="Show status of your Universal Basic Income")
+    @guild_only()
+    async def ubi(self, interaction: discord.Interaction):
+        income_text = await get_user_passive_income_status(interaction.user.id)
+        income_text += "\n-# Use **/ubis** to see available jobs."
+        embed = CustomEmbed(title="Passive Income status", description=income_text)
 
         await interaction.response.send_message(embed=embed)
 

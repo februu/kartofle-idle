@@ -176,6 +176,10 @@ def get_job_logs() -> list[JobLog]:
         return s.query(JobLog).all()
 
 
+def get_passive_incomes_by_user(user_id: int) -> list[PassiveIncome]:
+    with Session(engine) as s:
+        return s.query(PassiveIncome).filter_by(user_id=user_id).all()
+
 # --- CREATE ---
 
 
