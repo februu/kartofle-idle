@@ -103,7 +103,21 @@ class JobsCog(commands.Cog):
     async def ubi(self, interaction: discord.Interaction):
         income_text = await get_user_passive_income_status(interaction.user.id)
         income_text += "\n-# Use **/ubis** to see available jobs."
-        embed = CustomEmbed(title="Passive Income status", description=income_text)
+        embed = CustomEmbed(title="Universal Basic Income status", description=income_text)
+
+        await interaction.response.send_message(embed=embed)
+
+        
+    @app_commands.command(name="ubis", description="Show all Universal Basic Income sources")
+    @guild_only()
+    async def ubis(self, interaction: discord.Interaction):
+        passive_incomes = db.get_passive_incomes()
+        if not passive_incomes:
+            passive_incomes_text = "No Universal Basic Income sources available."
+        else:
+            passive_incomes_text = "\n".join(f"{j.id}: {j.title} — {j.amount_per_second}/s: ({j.description}s)" for j in passive_incomes)
+
+        embed = CustomEmbed(title="Universal Basic Income sources", description=passive_incomes_text)
 
         await interaction.response.send_message(embed=embed)
 
