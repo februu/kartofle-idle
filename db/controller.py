@@ -52,15 +52,14 @@ def settle_passive_income():
             seconds_elapsed = (now - last_settled).total_seconds()
             earned_amount = seconds_elapsed * passive.amount_per_second
 
-            if earned_amount > 0:
-                create_transaction(
-                    user_id=passive.user_id,
-                    amount=earned_amount,
-                    source=f"Passive income: {passive.title}",
-                    source_id=passive.id,
-                )
-
             passive.last_settled = now_iso
+
+            create_transaction(
+                user_id=passive.user_id,
+                amount=earned_amount,
+                source=f"Passive income: {passive.title}",
+                source_id=passive.id,
+            )                
 
         s.commit()
 
