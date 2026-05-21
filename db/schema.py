@@ -62,6 +62,9 @@ class Game(Base):
     options: Mapped[list["Option"]] = relationship(back_populates="game", cascade="all, delete-orphan")
     bets: Mapped[list["Bet"]] = relationship(back_populates="game", cascade="all, delete-orphan")
 
+    # Discord user ID of admin who created the game
+    created_by: Mapped[int]
+
 
 class Option(Base):
     __tablename__ = "options"

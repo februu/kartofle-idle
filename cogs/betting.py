@@ -132,7 +132,7 @@ async def create_game(interaction: discord.Interaction, title: str, description:
             "You must provide at least 2 options. All options must be unique.", ephemeral=True
         )
         return
-    game_id = db.create_game(title, description, parsed_option_list)
+    game_id = db.create_game(title, description, parsed_option_list, interaction.user.id)
     options = db.get_options_for_game(game_id)
     view = OptionButtonsView(options, game_id)
     embed = CustomEmbed(
@@ -148,6 +148,12 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
     game = db.get_game_by_id(id)
     if not game:
         await interaction.response.send_message("Game not found.", ephemeral=True)
+        return
+    if game.resolved:
+        await interaction.response.send_message("Game already resolved.", ephemeral=True)
+        return
+    if game.created_by == interaction.user.id:
+        await interaction.response.send_message("As a creator of the game, you cannot settle it.", ephemeral=True)
         return
     db.create_winning_transactions(game.id, winning_option)
     options = db.get_options_for_game(game.id)

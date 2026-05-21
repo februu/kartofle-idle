@@ -186,9 +186,14 @@ def get_passive_incomes_by_user(user_id: int) -> list[PassiveIncome]:
 # --- CREATE ---
 
 
-def create_game(title: str, description: str, options: list[str]) -> int:
+def create_game(title: str, description: str, options: list[str], created_by: int) -> int:
     with Session(engine) as s:
-        game = Game(title=title, description=description, options=[Option(description=opt) for opt in options])
+        game = Game(
+            title=title,
+            description=description,
+            options=[Option(description=opt) for opt in options],
+            created_by=created_by,
+        )
         s.add(game)
         s.flush()
         game_id = game.id
