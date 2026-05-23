@@ -214,16 +214,40 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
         description=f"**{game.title}**\nWinning option: **{winning_option_description}**\n-# Winners: {' '.join(f'<@{winner}>' for winner in winners) if winners else 'no one won :('}",
     )
     await interaction.followup.send(embed=embed)
+
+
+async def cancel_game(interaction: discord.Interaction, id: int):
+    """Handles the logic for canceling a betting game."""
+    game = db.get_game_by_id(id)
+    if not game:
+        await interaction.response.send_message("Game not found.", ephemeral=True)
+        return
+    if game.resolved:
+        await interaction.response.send_message("Game already resolved.", ephemeral=True)
+        return
+
+    await interaction.response.defer()
     await update_option_buttons(interaction, game.id, disable_buttons=True)
+    db.create_refund_transactions_for_bets(game.id)
+    db.delete_game(game.id)
+    embed = CustomEmbed(
+        title="Game canceled",
+        description=f"**{game.title}** was canceled. All bets have been refunded.",
+    )
+    await interaction.followup.send(embed=embed)
 
 
-async def remove_betting_game(channel: discord.abc.Messageable, message_id: int):
-    """Handles the logic for removing a betting game when its message is deleted, including refunding bets and updating the database."""
+async def handle_message_delete(channel: discord.abc.Messageable, message_id: int):
+    """Handles the betting game removal, resending the game message."""
     game = db.get_game_by_message_id(message_id)
     if game and not game.resolved:
-        db.create_refund_transactions_for_bets(game.id)
-        db.delete_game(game.id)
-        await channel.send(f"Betting game **{game.title}** has been removed and all bets have been refunded.")
+        view = OptionButtonsView(game.id)
+        embed = CustomEmbed(
+            title=f"[#{game.id}] {game.title}",
+            description=f"{game.description} \n-# Use the buttons below to place your bets!",
+        )
+        message = await channel.send(embed=embed, view=view)
+        db.update_game_message_id(game.id, message.id)
 
 
 ### ---------------------------------------------- ###
@@ -254,11 +278,19 @@ class BettingCog(commands.Cog):
     async def settle_game(self, interaction: discord.Interaction, game: int, winning_option: int):
         await settle_game(interaction, game, winning_option)
 
+    @app_commands.command(name="cancel_game", description="[ADMIN ONLY] Cancel a betting game")
+    @app_commands.describe(game="The betting game to cancel")
+    @app_commands.autocomplete(game=autocomplete_games)
+    @admin_only()
+    @guild_only()
+    async def cancel_game(self, interaction: discord.Interaction, game: int):
+        await cancel_game(interaction, game)
+
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         channel = self.bot.get_channel(payload.channel_id) or await self.bot.fetch_channel(payload.channel_id)
         assert isinstance(channel, discord.abc.Messageable)
-        await remove_betting_game(channel, payload.message_id)
+        await handle_message_delete(channel, payload.message_id)
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):  # noqa: ARG002
         if not isinstance(error, app_commands.CheckFailure):
