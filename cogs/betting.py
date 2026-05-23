@@ -1,5 +1,6 @@
 import math
 import os
+import random
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -7,6 +8,7 @@ from discord import app_commands
 from utils.checks import admin_only, guild_only
 from utils.embed import CustomEmbed
 import db.controller as db
+
 
 ### ---------------------------------------------- ###
 ###                 UI Components                  ###
@@ -22,15 +24,16 @@ class PlaceBetModal(discord.ui.Modal, title="Place your bet"):
         required=True,
     )
 
-    def __init__(self, game_id: int, option_id: int, user_balance: float):
+    def __init__(self, game_id: int, option_id: int, user_balance: float, multiplier: float):
         super().__init__()
         self.game_id = game_id
         self.option_id = option_id
         self.user_balance = user_balance
+        self.multiplier = multiplier
         self.amount.placeholder = f"You currently have {user_balance} kartoffeln."
 
     async def on_submit(self, interaction: discord.Interaction):
-        await place_bet(interaction, self.game_id, self.option_id, float(self.amount.value))
+        await place_bet(interaction, self.game_id, self.option_id, float(self.amount.value), self.multiplier)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         await interaction.response.send_message(
@@ -39,21 +42,29 @@ class PlaceBetModal(discord.ui.Modal, title="Place your bet"):
 
 
 class OptionButton(discord.ui.Button):
-    def __init__(self, label: str, game_id: int, option_id: int):
-        super().__init__(label=label, style=discord.ButtonStyle.primary)
+    def __init__(self, label: str, game_id: int, option_id: int, multiplier: float):
+        super().__init__(label=f"{label} (x{multiplier})", style=discord.ButtonStyle.primary)
         self.game_id = game_id
         self.option_id = option_id
+        self.multiplier = multiplier
 
     async def callback(self, interaction: discord.Interaction):
         balance = db.get_user_balance(interaction.user.id)
-        await interaction.response.send_modal(PlaceBetModal(self.game_id, self.option_id, balance))
+        await interaction.response.send_modal(PlaceBetModal(self.game_id, self.option_id, balance, self.multiplier))
 
 
 class OptionButtonsView(discord.ui.View):
-    def __init__(self, options: list, game_id: int):
+    def __init__(self, game_id: int):
         super().__init__(timeout=None)
+        options = db.get_options_for_game(game_id)
+        total_bets = db.get_sum_of_bets_for_game(game_id)
+        options_count = len(options)
         for option in options:
-            self.add_item(OptionButton(label=option.description, game_id=game_id, option_id=option.id))
+            total_bets_for_option = db.get_sum_of_bets_for_option(option.game_id, option.id)
+            multiplier = calculate_multiplier(total_bets, total_bets_for_option, options_count)
+            self.add_item(
+                OptionButton(label=option.description, game_id=game_id, option_id=option.id, multiplier=multiplier)
+            )
 
 
 ### ---------------------------------------------- ###
@@ -86,7 +97,38 @@ async def autocomplete_game_options(interaction: discord.Interaction, current: s
     ][:25]
 
 
-async def place_bet(interaction: discord.Interaction, game_id: int, option_id: int, amount: float):
+# TODO: Tweak the multiplier calculation formula to ensure it works with small amount of bets.
+def calculate_multiplier(total_bets: float, option_bets: float, options_count: int) -> float:
+    """Calculates the multiplier for an option based on the total bets and the bets on that option."""
+    if total_bets == 0 or option_bets == 0:
+        base = options_count * 0.95
+    else:
+        base = (total_bets / option_bets) * 0.95
+    # Jitter shrinks as pool grows: ~10% noise at small pools, near-zero at large ones
+    jitter_range = 0.10 / (1 + total_bets / 50)
+    jitter = random.uniform(-jitter_range, jitter_range)
+    return max(1.01, round(base * (1 + jitter), 2))
+
+
+async def update_option_buttons(interaction: discord.Interaction, game_id: int, disable_buttons: bool = False):
+    """Calculates and updates the multipliers for each option of a game based on the total bets placed. Updates the buttons in the game message to show the new multipliers."""
+    game = db.get_game_by_id(game_id)
+    if game and game.message_id:
+        try:
+            channel = interaction.channel
+            assert isinstance(channel, discord.abc.Messageable)
+            message = await channel.fetch_message(game.message_id)
+            view = OptionButtonsView(game.id)
+            if disable_buttons:
+                for item in view.children:
+                    if isinstance(item, discord.ui.Button):
+                        item.disabled = True
+            await message.edit(view=view)
+        except discord.NotFound:
+            pass
+
+
+async def place_bet(interaction: discord.Interaction, game_id: int, option_id: int, amount: float, multiplier: float):
     """Handles the logic for placing a bet, including validation and database updates."""
     game = db.get_game_by_id(int(game_id))
     if not game:
@@ -113,7 +155,7 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
         await interaction.response.send_message("You already have a bet on this game.", ephemeral=True)
         return
 
-    bet_id = db.create_bet(interaction.user.id, game_id, option_id, amount)
+    bet_id = db.create_bet(interaction.user.id, game_id, option_id, amount, multiplier)
     db.create_transaction(
         interaction.user.id,
         -amount,
@@ -125,6 +167,7 @@ async def place_bet(interaction: discord.Interaction, game_id: int, option_id: i
         description=f"<@{interaction.user.id}> placed a bet of **{amount}** kartoffeln.\n-# Game: **{game.title}** \n-# Option: **{selected_option.description}**",
     )
     await interaction.response.send_message(embed=embed)
+    await update_option_buttons(interaction, game_id)
 
 
 async def create_game(interaction: discord.Interaction, title: str, description: str, option_list: list[str]):
@@ -136,8 +179,7 @@ async def create_game(interaction: discord.Interaction, title: str, description:
         )
         return
     game_id = db.create_game(title, description, parsed_option_list, interaction.user.id)
-    options = db.get_options_for_game(game_id)
-    view = OptionButtonsView(options, game_id)
+    view = OptionButtonsView(game_id)
     embed = CustomEmbed(
         title=f"[#{game_id}] {title}", description=f"{description} \n-# Use the buttons below to place your bets!"
     )
@@ -170,18 +212,7 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
         description=f"**{game.title}**\nWinning option: **{winning_option_description}**\n-# Winners: {' '.join(f'<@{winner}>' for winner in winners) if winners else 'no one won :('}",
     )
     await interaction.response.send_message(embed=embed)
-    if game.message_id:
-        try:
-            channel = interaction.channel
-            assert isinstance(channel, discord.abc.Messageable)
-            message = await channel.fetch_message(game.message_id)
-            view = OptionButtonsView([opt.description for opt in options], game.id)
-            for item in view.children:
-                if isinstance(item, discord.ui.Button):
-                    item.disabled = True
-            await message.edit(view=view)
-        except discord.NotFound:
-            pass
+    await update_option_buttons(interaction, game.id, disable_buttons=True)
 
 
 async def remove_betting_game(channel: discord.abc.Messageable, message_id: int):

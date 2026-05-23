@@ -113,6 +113,20 @@ def get_options_for_game(game_id: int) -> list[Option]:
         return s.query(Option).filter_by(game_id=game_id).all()
 
 
+def get_sum_of_bets_for_game(game_id: int) -> int:
+    with Session(engine) as s:
+        return s.query(func.coalesce(func.sum(Bet.amount), 0)).filter(Bet.game_id == game_id).scalar()
+
+
+def get_sum_of_bets_for_option(game_id: int, option_id: int) -> int:
+    with Session(engine) as s:
+        return (
+            s.query(func.coalesce(func.sum(Bet.amount), 0))
+            .filter(Bet.game_id == game_id, Bet.option_id == option_id)
+            .scalar()
+        )
+
+
 def get_betters_for_option(game_id: int, option_id: int) -> list[int]:
     with Session(engine) as s:
         return [user_id for (user_id,) in s.query(Bet.user_id).filter_by(game_id=game_id, option_id=option_id).all()]
@@ -201,9 +215,11 @@ def create_game(title: str, description: str, options: list[str], created_by: in
         return game_id
 
 
-def create_bet(user_id: int, game_id: int, option_id: int, amount: float) -> int:
+def create_bet(user_id: int, game_id: int, option_id: int, amount: float, multiplier: float) -> int:
     with Session(engine) as s:
-        bet = Bet(user_id=user_id, game_id=game_id, option_id=option_id, amount=amount)
+        bet = Bet(
+            user_id=user_id, game_id=game_id, option_id=option_id, amount=amount, multiplier_at_placement=multiplier
+        )
         s.add(bet)
         s.commit()
         s.flush()
@@ -223,20 +239,21 @@ def create_winning_transactions(game_id: int, winning_option_id: int):
         if not live_game:
             return
 
-        winners = s.query(Bet.user_id, Bet.amount).filter_by(game_id=live_game.id, option_id=winning_option_id).all()
-        amount_of_options = s.execute(
-            select(func.coalesce(func.count(Option.id), 0)).where(Option.game_id == live_game.id)
-        ).scalar_one()
+        winners = (
+            s.query(Bet.user_id, Bet.amount, Bet.multiplier_at_placement)
+            .filter_by(game_id=live_game.id, option_id=winning_option_id)
+            .all()
+        )
 
         s.add_all(
             [
                 Transaction(
                     user_id=user_id,
-                    amount=amount * amount_of_options,
+                    amount=amount * multiplier,
                     source=f"Won bet on {live_game.title}#{live_game.id}",
                     source_id=live_game.id,
                 )
-                for user_id, amount in winners
+                for user_id, amount, multiplier in winners
             ]
         )
 

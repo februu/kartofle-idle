@@ -84,6 +84,7 @@ class Bet(Base):
     game_id: Mapped[int] = mapped_column(ForeignKey("games.game_id"))
     amount: Mapped[float]
     option_id: Mapped[int] = mapped_column(ForeignKey("options.option_id"))
+    multiplier_at_placement: Mapped[float]
 
     game: Mapped["Game"] = relationship(back_populates="bets")
 
