@@ -43,7 +43,7 @@ class PlaceBetModal(discord.ui.Modal, title="Place your bet"):
 
 class OptionButton(discord.ui.Button):
     def __init__(self, label: str, game_id: int, option_id: int, multiplier: float):
-        super().__init__(label=f"{label} (x{multiplier})", style=discord.ButtonStyle.primary)
+        super().__init__(label=f"(x{multiplier}) {label}", style=discord.ButtonStyle.primary)
         self.game_id = game_id
         self.option_id = option_id
         self.multiplier = multiplier
@@ -99,12 +99,11 @@ async def autocomplete_game_options(interaction: discord.Interaction, current: s
 
 # TODO: Tweak the multiplier calculation formula to ensure it works with small amount of bets.
 def calculate_multiplier(total_bets: float, option_bets: float, options_count: int) -> float:
-    """Calculates the multiplier for an option based on the total bets and the bets on that option."""
+    """Calculates the multiplier for an option based on the total bets value and the value of bets on that option."""
     if total_bets == 0 or option_bets == 0:
         base = options_count * 0.95
     else:
         base = (total_bets / option_bets) * 0.95
-    # Jitter shrinks as pool grows: ~10% noise at small pools, near-zero at large ones
     jitter_range = 0.10 / (1 + total_bets / 50)
     jitter = random.uniform(-jitter_range, jitter_range)
     return max(1.01, round(base * (1 + jitter), 2))
@@ -201,6 +200,9 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
     if not DEV and game.created_by == interaction.user.id:
         await interaction.response.send_message("As a creator of the game, you cannot settle it.", ephemeral=True)
         return
+
+    await interaction.response.defer()
+    await update_option_buttons(interaction, game.id, disable_buttons=True)
     db.create_winning_transactions(game.id, winning_option)
     options = db.get_options_for_game(game.id)
     winning_option_description = next(
@@ -211,7 +213,7 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
         title="Game settled!",
         description=f"**{game.title}**\nWinning option: **{winning_option_description}**\n-# Winners: {' '.join(f'<@{winner}>' for winner in winners) if winners else 'no one won :('}",
     )
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
     await update_option_buttons(interaction, game.id, disable_buttons=True)
 
 
@@ -244,7 +246,7 @@ class BettingCog(commands.Cog):
     async def create_game(self, interaction: discord.Interaction, title: str, description: str, options: str):
         await create_game(interaction, title, description, options.split(","))
 
-    @app_commands.command(name="settle", description="[ADMIN ONLY] Settle a betting game")
+    @app_commands.command(name="settle_game", description="[ADMIN ONLY] Settle a betting game")
     @app_commands.describe(game="The betting game to settle", winning_option="The winning option")
     @app_commands.autocomplete(game=autocomplete_games, winning_option=autocomplete_game_options)
     @admin_only()
