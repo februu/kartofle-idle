@@ -1,4 +1,5 @@
 import math
+import os
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,6 +11,8 @@ import db.controller as db
 ### ---------------------------------------------- ###
 ###                 UI Components                  ###
 ### ---------------------------------------------- ###
+
+DEV = os.getenv("DEV", "").lower() in {"1", "true", "yes", "on"}
 
 
 class PlaceBetModal(discord.ui.Modal, title="Place your bet"):
@@ -144,7 +147,8 @@ async def create_game(interaction: discord.Interaction, title: str, description:
 
 
 async def settle_game(interaction: discord.Interaction, id: int, winning_option: int):
-    """Handles the logic for settling a betting game, including validation and database updates."""
+    """Handles the logic for settling a betting game, including validation and database updates.
+    If DEV mode is on, the creator of the game can settle it, otherwise only non-creators can settle to prevent abuse."""
     game = db.get_game_by_id(id)
     if not game:
         await interaction.response.send_message("Game not found.", ephemeral=True)
@@ -152,7 +156,7 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
     if game.resolved:
         await interaction.response.send_message("Game already resolved.", ephemeral=True)
         return
-    if game.created_by == interaction.user.id:
+    if not DEV and game.created_by == interaction.user.id:
         await interaction.response.send_message("As a creator of the game, you cannot settle it.", ephemeral=True)
         return
     db.create_winning_transactions(game.id, winning_option)
