@@ -1,15 +1,14 @@
-import os
 import discord
 from discord import app_commands
 
-_ADMINS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",")]
+from config import config
 
 
 def admin_only():
     """A decorator that checks if the user is an admin."""
 
     async def predicate(interaction: discord.Interaction) -> bool:
-        if interaction.user.id not in _ADMINS:
+        if interaction.user.id not in config.admin_ids:
             await interaction.response.send_message("You lack permissions, what a shame...", ephemeral=True)
             raise app_commands.CheckFailure()
         return True

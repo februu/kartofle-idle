@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta
 import discord
 from discord.ext import commands
@@ -8,7 +7,7 @@ from utils.embed import CustomEmbed
 from utils.checks import guild_only
 import db.controller as db
 
-_UNIQUE_JOBS = os.getenv("UNIQUE_JOBS", "").lower() in {"1", "true", "yes", "on"}
+from config import config
 
 
 ### ---------------------------------------------- ###
@@ -121,7 +120,7 @@ class JobsCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    if _UNIQUE_JOBS:
+    if config.unique_jobs:
 
         @app_commands.command(name="work", description="Start doing some work")
         @app_commands.describe(job="Select your job")

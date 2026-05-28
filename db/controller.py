@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -7,6 +6,7 @@ from .engine import engine
 from .schema import Bet, Game, Option, Transaction, Job, JobLog, PassiveIncome
 from .init import init_db, init_dev_db
 
+from config import config
 
 ### ---------------------------------------------- ###
 ###    Helper functions for database operations    ###
@@ -59,15 +59,13 @@ def settle_passive_income():
                 amount=earned_amount,
                 source=f"Passive income: {passive.title}",
                 source_id=passive.id,
-            )                
+            )
 
         s.commit()
 
 
-DEV = os.getenv("DEV", "").lower() in {"1", "true", "yes", "on"}
-
 init_db()
-if DEV:
+if config.dev:
     init_dev_db()
 
 

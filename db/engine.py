@@ -1,6 +1,4 @@
-import os
-
 from sqlalchemy import create_engine
+from config import config
 
-_db_path = os.getenv("SQLITE_PATH", ":memory:")
-engine = create_engine(f"sqlite:///{_db_path}")
+engine = create_engine(config.db_path)
