@@ -1,0 +1,17 @@
+services:
+  discord-bot:
+    image: ghcr.io/februu/kartofle-idle:latest
+    restart: unless-stopped
+    env_file: .env
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_POLL_INTERVAL=60
