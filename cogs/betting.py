@@ -1,5 +1,4 @@
 import math
-import os
 import random
 import discord
 from discord.ext import commands
@@ -9,12 +8,11 @@ from utils.checks import admin_only, guild_only
 from utils.embed import CustomEmbed
 import db.controller as db
 
+from config import config
 
 ### ---------------------------------------------- ###
 ###                 UI Components                  ###
 ### ---------------------------------------------- ###
-
-DEV = os.getenv("DEV", "").lower() in {"1", "true", "yes", "on"}
 
 
 class PlaceBetModal(discord.ui.Modal, title="Place your bet"):
@@ -197,7 +195,7 @@ async def settle_game(interaction: discord.Interaction, id: int, winning_option:
     if game.resolved:
         await interaction.response.send_message("Game already resolved.", ephemeral=True)
         return
-    if not DEV and game.created_by == interaction.user.id:
+    if not config.dev and game.created_by == interaction.user.id:
         await interaction.response.send_message("As a creator of the game, you cannot settle it.", ephemeral=True)
         return
 
